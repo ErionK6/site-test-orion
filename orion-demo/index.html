@@ -1,0 +1,67 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Orion - Démo Délégation</title>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🚀 Orion Trading Bot - Démo</h1>
+      <p>
+        Connectez votre wallet Phantom (Devnet) pour créer et gérer vos
+        délégations de trading.
+      </p>
+
+      <button id="connectButton" class="btn">Connecter Wallet Phantom</button>
+      <div id="walletInfo" class="hidden">
+        <p>Wallet Connecté: <b id="walletAddress"></b></p>
+      </div>
+
+      <hr />
+
+      <div id="controls" class="hidden">
+        <div class="card">
+          <h2>Créer / Mettre à Jour une Délégation</h2>
+          <div class="form-group">
+            <label for="delegationId">ID de Délégation (ex: 0, 1, 2...)</label>
+            <input type="number" id="delegationId" value="0" />
+          </div>
+          <div class="form-group">
+            <label for="solToWrap">SOL à Wrapper (ex: 0.1)</label>
+            <input type="number" id="solToWrap" step="0.01" value="0.1" />
+          </div>
+          <div class="form-group">
+            <label for="botPubkey">Clé Publique du Bot Autorisé</label>
+            <input
+              type="text"
+              id="botPubkey"
+              value="Fh5exTSdTdyS4r76Cv1LLyYvALBFJYbyL6bSp9jB44iY"
+              readonly
+            />
+          </div>
+          <button id="createButton" class="btn btn-primary" disabled>
+            Créer Délégation
+          </button>
+        </div>
+
+        <div class="card">
+          <h2>Révoquer une Délégation</h2>
+          <div class="form-group">
+            <label for="revokeDelegationId">ID de Délégation à Révoquer</label>
+            <input type="number" id="revokeDelegationId" value="0" />
+          </div>
+          <button id="revokeButton" class="btn btn-danger" disabled>
+            Révoquer Délégation
+          </button>
+        </div>
+      </div>
+
+      <h3>Logs</h3>
+      <div id="logs"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

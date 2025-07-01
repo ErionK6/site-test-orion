@@ -1,0 +1,2554 @@
+{
+  "address": "orionDXd6giDNe3YfcuXhg2kK7gwy9DueaFSrdFNsaa",
+  "metadata": {
+    "name": "orion_pda_nexus",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Orion PDA Nexus V1 Pre-Prod"
+  },
+  "instructions": [
+    {
+      "name": "admin_update_delegation_bot_authority",
+      "docs": [
+        "Allows the program admin to update the authorized bot for a specific user's delegation.",
+        "This is an administrative override, intended for critical situations like a bot key compromise.",
+        "The `target_user_authority` argument is used to find and validate the correct delegation PDA."
+      ],
+      "discriminator": [
+        199,
+        119,
+        201,
+        189,
+        111,
+        242,
+        48,
+        222
+      ],
+      "accounts": [
+        {
+          "name": "program_state",
+          "docs": [
+            "The global program state account, used to verify the admin signer and program status.",
+            "PDA: seeds = [b\"orion_state\"], bump.",
+            "Constraint: `program_state.admin` must match the `admin` signer."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "docs": [
+            "The current program admin, must be the signer of the transaction."
+          ],
+          "signer": true,
+          "relations": [
+            "program_state"
+          ]
+        },
+        {
+          "name": "orion_delegation",
+          "docs": [
+            "The specific user's delegation account whose `bot_authority` will be modified.",
+            "PDA: seeds = [b\"orion_delegation\", target_user_authority.key()], bump.",
+            "The `target_user_authority` (passed as an instruction argument) is used in the seeds.",
+            "The match between `orion_delegation.user_authority` and `target_user_authority` is",
+            "implicitly verified by the PDA derivation and can be explicitly checked in `lib.rs`."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "target_user_authority"
+              },
+              {
+                "kind": "arg",
+                "path": "delegation_id"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "target_user_authority",
+          "type": "pubkey"
+        },
+        {
+          "name": "_delegation_id",
+          "type": "u64"
+        },
+        {
+          "name": "new_bot_authority_pubkey",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "execute_meteora_dlmm_swap",
+      "docs": [
+        "Executes a swap on a Meteora DLMM pool using the user's delegated wSOL.",
+        "This function targets the `swapExactOut` instruction of the Meteora DLMM program.",
+        "",
+        "The bot provides the necessary Meteora DLMM accounts (LbPair, reserves, mints, oracle,",
+        "optional bitmap extension and host fee account, and required BinArray PDAs via remaining_accounts).",
+        "This instruction:",
+        "1. Validates the delegation, caller, and program pause state.",
+        "2. Verifies the user's trade limit (`amount_per_trade`) against the max input wSOL.",
+        "3. Calculates Orion protocol fees on-chain.",
+        "4. Transfers these fees from the user's wSOL ATA to the bot's wSOL fee ATA.",
+        "5. Constructs and executes a CPI to the Meteora DLMM `swapExactOut` instruction,",
+        "with the Orion PDA signing as the `user` (authority) for the user's input wSOL ATA.",
+        "",
+        "Args:",
+        "* `max_in_amount`: The maximum amount of input token (wSOL, i.e., TokenY) the user is willing to spend.",
+        "* `out_amount`: The exact amount of output token (TokenX) the user wishes to receive.",
+        "* `create_destination_ata_if_needed`: Client hint for Orion fee calculation (user's destination ATA rent)."
+      ],
+      "discriminator": [
+        6,
+        172,
+        152,
+        149,
+        99,
+        88,
+        154,
+        199
+      ],
+      "accounts": [
+        {
+          "name": "orion_delegation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user_authority"
+              },
+              {
+                "kind": "arg",
+                "path": "delegation_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_authority",
+          "relations": [
+            "orion_delegation"
+          ]
+        },
+        {
+          "name": "bot_authority",
+          "docs": [
+            "The bot authorized for this delegation. Must be the transaction signer."
+          ],
+          "signer": true,
+          "relations": [
+            "orion_delegation"
+          ]
+        },
+        {
+          "name": "orion_pda",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user_authority"
+              },
+              {
+                "kind": "arg",
+                "path": "delegation_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_wsol_account",
+          "docs": [
+            "User's wSOL ATA. For `swapExactOut` where user receives TokenX by paying TokenY (wSOL),",
+            "this will be `user_token_in` for the Meteora instruction."
+          ],
+          "writable": true
+        },
+        {
+          "name": "user_destination_token_account",
+          "docs": [
+            "User's destination ATA for the token being purchased (TokenX). This will be `user_token_out`."
+          ],
+          "writable": true
+        },
+        {
+          "name": "bot_wsol_fee_account",
+          "docs": [
+            "The executing bot's wSOL ATA where Orion fees are sent."
+          ],
+          "writable": true
+        },
+        {
+          "name": "wsol_mint",
+          "docs": [
+            "The wSOL mint. Assumed to be TokenY if swapping wSOL for TokenX."
+          ],
+          "address": "So11111111111111111111111111111111111111112"
+        },
+        {
+          "name": "destination_mint",
+          "docs": [
+            "The Mint of the destination token (TokenX)."
+          ]
+        },
+        {
+          "name": "meteora_dlmm_program",
+          "address": "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo"
+        },
+        {
+          "name": "lb_pair",
+          "writable": true
+        },
+        {
+          "name": "bin_array_bitmap_extension",
+          "docs": [
+            "If the pool uses an extension, the bot must provide this. Otherwise, can be Meteora program ID."
+          ],
+          "optional": true
+        },
+        {
+          "name": "reserve_x",
+          "writable": true
+        },
+        {
+          "name": "reserve_y",
+          "writable": true
+        },
+        {
+          "name": "token_x_mint"
+        },
+        {
+          "name": "token_y_mint"
+        },
+        {
+          "name": "oracle",
+          "writable": true
+        },
+        {
+          "name": "host_fee_in",
+          "docs": [
+            "For V1, this can be the Meteora program ID if not used."
+          ],
+          "optional": true
+        },
+        {
+          "name": "token_x_program"
+        },
+        {
+          "name": "token_y_program"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "token_program",
+          "docs": [
+            "Our main SPL Token program reference."
+          ],
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "program_state",
+          "docs": [
+            "Global program state, used for `is_paused` check."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "delegation_id",
+          "type": "u64"
+        },
+        {
+          "name": "max_in_amount",
+          "type": "u64"
+        },
+        {
+          "name": "out_amount",
+          "type": "u64"
+        },
+        {
+          "name": "create_destination_ata_if_needed",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "execute_orca_swap",
+      "docs": [
+        "Executes a swap on an Orca Whirlpool using the user's delegated wSOL.",
+        "",
+        "The bot provides the necessary Orca Whirlpool accounts (pool, vaults, tick arrays, oracle).",
+        "This instruction:",
+        "1. Validates the delegation, caller, and program pause state.",
+        "2. Verifies the user's trade limit (`amount_per_trade`) against the input wSOL amount.",
+        "3. Calculates Orion protocol fees on-chain.",
+        "4. Transfers these fees from the user's wSOL ATA to the bot's wSOL fee ATA.",
+        "5. Constructs and executes a CPI to the Orca Whirlpools `swap` instruction,",
+        "with the Orion PDA signing as the `token_authority` for the user's input wSOL ATA.",
+        "",
+        "Args:",
+        "* `amount`: The amount of token for the swap. Behavior depends on `amount_specified_is_input`.",
+        "* `other_amount_threshold`: Slippage protection. If `amount` is input, this is min output. If `amount` is output, this is max input.",
+        "* `sqrt_price_limit`: The sqrt_price limit for the swap, offering further price protection.",
+        "* `amount_specified_is_input`: Boolean indicating if `amount` refers to the input token amount.",
+        "* `a_to_b`: Boolean indicating swap direction (e.g., true for wSOL (TokenA) to DestinationToken (TokenB)).",
+        "* `create_destination_ata_if_needed`: Client hint for Orion fee calculation (user's destination ATA rent)."
+      ],
+      "discriminator": [
+        13,
+        121,
+        180,
+        113,
+        158,
+        163,
+        4,
+        150
+      ],
+      "accounts": [
+        {
+          "name": "orion_delegation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user_authority"
+              },
+              {
+                "kind": "arg",
+                "path": "delegation_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_authority",
+          "relations": [
+            "orion_delegation"
+          ]
+        },
+        {
+          "name": "bot_authority",
+          "docs": [
+            "The bot authorized for this delegation. Must be the transaction signer."
+          ],
+          "signer": true,
+          "relations": [
+            "orion_delegation"
+          ]
+        },
+        {
+          "name": "orion_pda",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user_authority"
+              },
+              {
+                "kind": "arg",
+                "path": "delegation_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_wsol_account",
+          "docs": [
+            "User's wSOL ATA. If `a_to_b` is true, this is `token_owner_account_a` (source)."
+          ],
+          "writable": true
+        },
+        {
+          "name": "user_destination_token_account",
+          "docs": [
+            "User's destination ATA. If `a_to_b` is true, this is `token_owner_account_b` (receives output)."
+          ],
+          "writable": true
+        },
+        {
+          "name": "bot_wsol_fee_account",
+          "docs": [
+            "The executing bot's wSOL ATA where Orion fees are sent."
+          ],
+          "writable": true
+        },
+        {
+          "name": "wsol_mint",
+          "docs": [
+            "The wSOL mint. Represents Token A if `a_to_b` is true."
+          ],
+          "address": "So11111111111111111111111111111111111111112"
+        },
+        {
+          "name": "destination_mint",
+          "docs": [
+            "The Mint of the destination token. Represents Token B if `a_to_b` is true."
+          ]
+        },
+        {
+          "name": "orca_whirlpool_program",
+          "address": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"
+        },
+        {
+          "name": "whirlpool",
+          "writable": true
+        },
+        {
+          "name": "token_vault_a",
+          "writable": true
+        },
+        {
+          "name": "token_vault_b",
+          "writable": true
+        },
+        {
+          "name": "tick_array_0",
+          "writable": true
+        },
+        {
+          "name": "tick_array_1",
+          "writable": true
+        },
+        {
+          "name": "tick_array_2",
+          "writable": true
+        },
+        {
+          "name": "oracle",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "docs": [
+            "The SPL Token program."
+          ],
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "program_state",
+          "docs": [
+            "Global program state, used for `is_paused` check."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "delegation_id",
+          "type": "u64"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "other_amount_threshold",
+          "type": "u64"
+        },
+        {
+          "name": "sqrt_price_limit",
+          "type": "u128"
+        },
+        {
+          "name": "amount_specified_is_input",
+          "type": "bool"
+        },
+        {
+          "name": "a_to_b",
+          "type": "bool"
+        },
+        {
+          "name": "create_destination_ata_if_needed",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "execute_pumpswap_amm_trade",
+      "docs": [
+        "Executes a swap on a PumpSwap AMM pool using the user's delegated wSOL.",
+        "",
+        "The bot provides the necessary PumpSwap AMM pool accounts. This instruction:",
+        "1. Validates the delegation, caller, and program pause state.",
+        "2. Verifies the user's trade limit (`amount_per_trade`).",
+        "3. Calculates Orion protocol fees on-chain.",
+        "4. Transfers these fees from the user's wSOL ATA to the bot's wSOL fee ATA.",
+        "5. Constructs and executes a CPI to the PumpSwap AMM's `buy` instruction,",
+        "with the Orion PDA signing as the `user` (authority) for the user's input wSOL ATA.",
+        "",
+        "Args:",
+        "* `base_amount_out`: The desired amount of \"base\" token (output) to receive.",
+        "* `max_quote_amount_in`: The maximum amount of \"quote\" token (wSOL, input) the user is willing to spend.",
+        "* `create_destination_ata_if_needed`: Client hint for Orion fee calculation (user's destination ATA rent)."
+      ],
+      "discriminator": [
+        251,
+        105,
+        48,
+        175,
+        147,
+        114,
+        80,
+        129
+      ],
+      "accounts": [
+        {
+          "name": "orion_delegation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user_authority"
+              },
+              {
+                "kind": "arg",
+                "path": "delegation_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_authority",
+          "relations": [
+            "orion_delegation"
+          ]
+        },
+        {
+          "name": "bot_authority",
+          "docs": [
+            "The bot authorized for this delegation. Must be the transaction signer."
+          ],
+          "signer": true,
+          "relations": [
+            "orion_delegation"
+          ]
+        },
+        {
+          "name": "orion_pda",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user_authority"
+              },
+              {
+                "kind": "arg",
+                "path": "delegation_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_wsol_account",
+          "docs": [
+            "User's source wSOL ATA (will be `user_quote_token_account` for PumpSwap)."
+          ],
+          "writable": true
+        },
+        {
+          "name": "user_destination_base_token_account",
+          "writable": true
+        },
+        {
+          "name": "bot_wsol_fee_account",
+          "docs": [
+            "The executing bot's wSOL ATA where Orion fees are sent."
+          ],
+          "writable": true
+        },
+        {
+          "name": "wsol_mint",
+          "docs": [
+            "The wSOL mint (used as Quote Mint for PumpSwap and for Orion fees)."
+          ],
+          "address": "So11111111111111111111111111111111111111112"
+        },
+        {
+          "name": "base_mint",
+          "docs": [
+            "The Mint of the \"base\" token to be purchased."
+          ]
+        },
+        {
+          "name": "pumpswap_amm_program",
+          "address": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "program_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "delegation_id",
+          "type": "u64"
+        },
+        {
+          "name": "base_amount_out",
+          "type": "u64"
+        },
+        {
+          "name": "max_quote_amount_in",
+          "type": "u64"
+        },
+        {
+          "name": "create_destination_ata_if_needed",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "execute_raydium_swap_v4",
+      "docs": [
+        "Executes a swap on a Raydium AMM V4 pool using the user's delegated wSOL.",
+        "Raydium-specific pool and market accounts are passed via `ctx.remaining_accounts`.",
+        "",
+        "The bot provides the core Raydium program IDs in the context, which are validated",
+        "against hardcoded constants. The 14 Raydium pool/market specific accounts",
+        "(amm_id, amm_authority, open_orders, etc.) must be provided in `ctx.remaining_accounts`",
+        "in the exact order expected by the Raydium `swapBaseIn` instruction's CPI.",
+        "",
+        "This instruction:",
+        "1. Validates delegation, caller, and program pause state.",
+        "2. Verifies user's trade limit (`amount_per_trade`) against `amount_in`.",
+        "3. Calculates Orion protocol fees on-chain.",
+        "4. Transfers these fees from user's wSOL ATA to the bot's wSOL fee ATA.",
+        "5. Constructs and executes a CPI to Raydium AMM V4's `swapBaseIn`,",
+        "with the Orion PDA signing as authority for the user's input wSOL ATA.",
+        "",
+        "Args:",
+        "* `amount_in`: The amount of input token (wSOL) to be swapped.",
+        "* `minimum_amount_out`: Minimum amount of output token expected.",
+        "* `create_destination_ata_if_needed`: Hint for Orion fee calculation."
+      ],
+      "discriminator": [
+        221,
+        126,
+        72,
+        226,
+        125,
+        21,
+        51,
+        109
+      ],
+      "accounts": [
+        {
+          "name": "orion_delegation",
+          "docs": [
+            "User's delegation PDA."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user_authority"
+              },
+              {
+                "kind": "arg",
+                "path": "delegation_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_authority",
+          "relations": [
+            "orion_delegation"
+          ]
+        },
+        {
+          "name": "bot_authority",
+          "docs": [
+            "Authorized bot executing the transaction. Must be a signer."
+          ],
+          "signer": true,
+          "relations": [
+            "orion_delegation"
+          ]
+        },
+        {
+          "name": "orion_pda",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user_authority"
+              },
+              {
+                "kind": "arg",
+                "path": "delegation_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_token_account_in",
+          "docs": [
+            "User's wSOL ATA (source for swap input and Orion fees)."
+          ],
+          "writable": true
+        },
+        {
+          "name": "user_token_account_out",
+          "docs": [
+            "User's destination ATA for receiving swapped tokens."
+          ],
+          "writable": true
+        },
+        {
+          "name": "bot_wsol_fee_account",
+          "docs": [
+            "Bot's wSOL ATA for receiving Orion fees."
+          ],
+          "writable": true
+        },
+        {
+          "name": "fee_mint",
+          "docs": [
+            "The wSOL Mint account."
+          ],
+          "address": "So11111111111111111111111111111111111111112"
+        },
+        {
+          "name": "pool_base_token_mint",
+          "docs": [
+            "The Mint account of the base token in the Raydium pool (token being bought)."
+          ]
+        },
+        {
+          "name": "amm_program",
+          "address": "HWy1jotHpo6UqeQxx49dpYYdQB8wj9Qk9MdxwjLvDHB8"
+        },
+        {
+          "name": "market_program",
+          "address": "EoTcMgcDRTJVZDMZWBoU6rhYHZfkNTVEAfz3uUJRcYGj"
+        },
+        {
+          "name": "token_program",
+          "docs": [
+            "The SPL Token program."
+          ],
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "The Solana System program."
+          ],
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "program_state",
+          "docs": [
+            "Global program state for checking `is_paused`."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "delegation_id",
+          "type": "u64"
+        },
+        {
+          "name": "amount_in",
+          "type": "u64"
+        },
+        {
+          "name": "minimum_amount_out",
+          "type": "u64"
+        },
+        {
+          "name": "create_destination_ata_if_needed",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "initialize_delegation",
+      "docs": [
+        "Initialise une nouvelle délégation pour un utilisateur.",
+        "Crée l'ATA wSOL si nécessaire, wrappe du SOL, et approuve une quantité infinie au PDA Orion.",
+        "Définit le bot autorisé, les frais prioritaires initiaux et la limite de montant par trade."
+      ],
+      "discriminator": [
+        101,
+        15,
+        195,
+        117,
+        216,
+        209,
+        68,
+        233
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "docs": [
+            "The user initializing the delegation; pays for new account creations."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "orion_delegation",
+          "docs": [
+            "The Orion delegation account (PDA derived from `b\"orion_delegation\"` and user's key).",
+            "This account will be initialized."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              },
+              {
+                "kind": "arg",
+                "path": "delegation_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wsol_mint",
+          "docs": [
+            "The wSOL mint account. Used for ATA creation and validation."
+          ],
+          "address": "So11111111111111111111111111111111111111112"
+        },
+        {
+          "name": "user_wsol_account",
+          "docs": [
+            "The user's wSOL Associated Token Account (ATA).",
+            "Created if it does not exist. SOL will be wrapped into this account.",
+            "The PDA will be approved to spend from this account."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "user"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wsol_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "orion_pda",
+          "docs": [
+            "Derived from `b\"orion_delegation\"` and user's key.",
+            "Its authority is implicitly validated by `invoke_signed` in `lib.rs` using these seeds."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              },
+              {
+                "kind": "arg",
+                "path": "delegation_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "The Solana system program, required for account creation and SOL transfer."
+          ],
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "docs": [
+            "The SPL Token program, required for token operations (wrap, approve, ATA creation)."
+          ],
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "docs": [
+            "The SPL Associated Token Account program, required for ATA creation."
+          ],
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "program_state",
+          "docs": [
+            "The global program state account, used to check if the program is paused.",
+            "PDA: seeds = [b\"orion_state\"], bump."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "_delegation_id",
+          "type": "u64"
+        },
+        {
+          "name": "sol_to_wrap_lamports",
+          "type": "u64"
+        },
+        {
+          "name": "initial_priority_fee",
+          "type": "u64"
+        },
+        {
+          "name": "initial_amount_per_trade",
+          "type": "u64"
+        },
+        {
+          "name": "bot_authority_pubkey",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "initialize_program_state",
+      "docs": [
+        "Initializes the global program state.",
+        "Sets the initial admin and pause status. The service fee is a hardcoded constant.",
+        "This instruction should be called only once by the deployer/initial admin."
+      ],
+      "discriminator": [
+        114,
+        90,
+        170,
+        208,
+        223,
+        41,
+        40,
+        160
+      ],
+      "accounts": [
+        {
+          "name": "program_state",
+          "docs": [
+            "The global program state account (PDA derived from `b\"orion_state\"`).",
+            "Will be initialized by this instruction."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "docs": [
+            "The signer who pays for the account initialization and becomes the initial admin",
+            "recorded in `program_state`."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "The Solana system program, required for account creation."
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "revoke_orion_delegation",
+      "docs": [
+        "Révoque la délégation SPL Token pour l'ATA wSOL et ferme le compte de délégation Orion.",
+        "L'utilisateur récupère la rent du compte de délégation.",
+        "Peut être appelé même si le programme est en pause."
+      ],
+      "discriminator": [
+        174,
+        153,
+        178,
+        56,
+        195,
+        109,
+        130,
+        127
+      ],
+      "accounts": [
+        {
+          "name": "user_authority",
+          "docs": [
+            "The user revoking the delegation; receives rent from the closed delegation account.",
+            "Must be the original `user_authority` of the `orion_delegation` account."
+          ],
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "orion_delegation"
+          ]
+        },
+        {
+          "name": "orion_delegation",
+          "docs": [
+            "The Orion delegation account (PDA) to be closed.",
+            "PDA: seeds = [b\"orion_delegation\", user_authority.key()], bump.",
+            "Constraint: `orion_delegation.user_authority` must match the `user_authority` signer."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user_authority"
+              },
+              {
+                "kind": "arg",
+                "path": "delegation_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_wsol_account",
+          "docs": [
+            "The user's wSOL Associated Token Account (ATA) from which the delegation will be revoked.",
+            "Constraint: Must be owned by `user_authority` and be for the `wsol_mint`."
+          ],
+          "writable": true
+        },
+        {
+          "name": "wsol_mint",
+          "docs": [
+            "The wSOL mint account, used to validate `user_wsol_account`."
+          ],
+          "address": "So11111111111111111111111111111111111111112"
+        },
+        {
+          "name": "token_program",
+          "docs": [
+            "The SPL Token program, required for the `revoke` CPI."
+          ],
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "_delegation_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_amount_per_trade",
+      "docs": [
+        "Met à jour la limite de montant wSOL utilisable pour la partie \"achat\" d'un trade proxy.",
+        "Appelé par l'utilisateur."
+      ],
+      "discriminator": [
+        213,
+        47,
+        206,
+        228,
+        60,
+        172,
+        7,
+        149
+      ],
+      "accounts": [
+        {
+          "name": "orion_delegation",
+          "docs": [
+            "The user's delegation account whose `amount_per_trade` will be updated.",
+            "PDA: seeds = [b\"orion_delegation\", user_authority.key()], bump.",
+            "Constraint: `orion_delegation.user_authority` must match the `user_authority` signer."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user_authority"
+              },
+              {
+                "kind": "arg",
+                "path": "delegation_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_authority",
+          "docs": [
+            "The user who owns the delegation and is authorizing this change. Must be a signer."
+          ],
+          "signer": true,
+          "relations": [
+            "orion_delegation"
+          ]
+        },
+        {
+          "name": "program_state",
+          "docs": [
+            "The global program state account, used to check if the program is paused.",
+            "PDA: seeds = [b\"orion_state\"], bump."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "_delegation_id",
+          "type": "u64"
+        },
+        {
+          "name": "new_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_pause",
+      "docs": [
+        "Pauses or unpauses the entire program.",
+        "When paused, most user and bot operations (except `revoke_delegation`) are disabled.",
+        "Only callable by the current program admin."
+      ],
+      "discriminator": [
+        63,
+        32,
+        154,
+        2,
+        56,
+        103,
+        79,
+        45
+      ],
+      "accounts": [
+        {
+          "name": "program_state",
+          "docs": [
+            "The global program state account, holds the `is_paused` flag and admin pubkey.",
+            "PDA: seeds = [b\"orion_state\"], bump.",
+            "Constraint: `program_state.admin` must match the `admin` signer."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "docs": [
+            "The current program admin, must be the signer of the transaction."
+          ],
+          "signer": true,
+          "relations": [
+            "program_state"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "is_paused",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "set_priority_fee",
+      "docs": [
+        "Met à jour les frais prioritaires de base pour une délégation spécifique.",
+        "Appelé par l'utilisateur."
+      ],
+      "discriminator": [
+        212,
+        206,
+        62,
+        53,
+        34,
+        72,
+        169,
+        240
+      ],
+      "accounts": [
+        {
+          "name": "orion_delegation",
+          "docs": [
+            "The user's delegation account whose `priority_fee_lamports` will be updated.",
+            "PDA: seeds = [b\"orion_delegation\", user_authority.key()], bump.",
+            "Constraint: `orion_delegation.user_authority` must match the `user_authority` signer."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user_authority"
+              },
+              {
+                "kind": "arg",
+                "path": "delegation_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_authority",
+          "docs": [
+            "The user who owns the delegation and is authorizing this change. Must be a signer."
+          ],
+          "signer": true,
+          "relations": [
+            "orion_delegation"
+          ]
+        },
+        {
+          "name": "program_state",
+          "docs": [
+            "The global program state account, used to check if the program is paused.",
+            "PDA: seeds = [b\"orion_state\"], bump."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "_delegation_id",
+          "type": "u64"
+        },
+        {
+          "name": "new_priority_fee",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "toggle_delegation_active",
+      "discriminator": [
+        107,
+        94,
+        157,
+        41,
+        15,
+        74,
+        155,
+        63
+      ],
+      "accounts": [
+        {
+          "name": "orion_delegation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user_authority"
+              },
+              {
+                "kind": "arg",
+                "path": "delegation_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_authority",
+          "signer": true,
+          "relations": [
+            "orion_delegation"
+          ]
+        },
+        {
+          "name": "program_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "_delegation_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "update_admin",
+      "docs": [
+        "Updates the program's administrative authority to a new public key.",
+        "Only callable by the current program admin."
+      ],
+      "discriminator": [
+        161,
+        176,
+        40,
+        213,
+        60,
+        184,
+        179,
+        228
+      ],
+      "accounts": [
+        {
+          "name": "program_state",
+          "docs": [
+            "The global program state account.",
+            "PDA: seeds = [b\"orion_state\"], bump.",
+            "Constraint: `program_state.admin` must match the `admin` signer."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  105,
+                  111,
+                  110,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "docs": [
+            "The current program admin, must be the signer of the transaction."
+          ],
+          "signer": true,
+          "relations": [
+            "program_state"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "new_admin_pubkey",
+          "type": "pubkey"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "OrionDelegation",
+      "discriminator": [
+        174,
+        145,
+        158,
+        88,
+        185,
+        158,
+        76,
+        19
+      ]
+    },
+    {
+      "name": "ProgramState",
+      "discriminator": [
+        77,
+        209,
+        137,
+        229,
+        149,
+        67,
+        167,
+        230
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "AmountPerTradeUpdated",
+      "discriminator": [
+        137,
+        146,
+        104,
+        113,
+        21,
+        49,
+        61,
+        97
+      ]
+    },
+    {
+      "name": "DelegationActiveStatusChanged",
+      "discriminator": [
+        56,
+        117,
+        206,
+        152,
+        14,
+        245,
+        134,
+        145
+      ]
+    },
+    {
+      "name": "DelegationCreated",
+      "discriminator": [
+        20,
+        93,
+        12,
+        34,
+        227,
+        63,
+        100,
+        136
+      ]
+    },
+    {
+      "name": "DelegationRevoked",
+      "discriminator": [
+        59,
+        158,
+        142,
+        49,
+        164,
+        116,
+        220,
+        8
+      ]
+    },
+    {
+      "name": "PriorityFeeUpdated",
+      "discriminator": [
+        201,
+        201,
+        42,
+        209,
+        58,
+        55,
+        34,
+        152
+      ]
+    },
+    {
+      "name": "ProgramPauseStateChanged",
+      "discriminator": [
+        147,
+        1,
+        41,
+        152,
+        164,
+        119,
+        128,
+        125
+      ]
+    },
+    {
+      "name": "TradeExecuted",
+      "discriminator": [
+        41,
+        110,
+        64,
+        129,
+        60,
+        79,
+        179,
+        80
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "DelegationInactive",
+      "msg": "Délégation inactive."
+    },
+    {
+      "code": 6001,
+      "name": "UnauthorizedBot",
+      "msg": "Bot non autorisé."
+    },
+    {
+      "code": 6002,
+      "name": "ReentrancyLockActive",
+      "msg": "Compte déjà en utilisation (Reentrancy)."
+    },
+    {
+      "code": 6003,
+      "name": "WrapAmountMustBePositive",
+      "msg": "Montant de wrap SOL doit être positif."
+    },
+    {
+      "code": 6004,
+      "name": "InvalidOwner",
+      "msg": "Compte token n'appartient pas à l'utilisateur."
+    },
+    {
+      "code": 6005,
+      "name": "FeeCalculationError",
+      "msg": "Erreur calcul frais."
+    },
+    {
+      "code": 6006,
+      "name": "SlippageExceeded",
+      "msg": "Slippage dépassé (erreur DEX)."
+    },
+    {
+      "code": 6007,
+      "name": "InvalidDexAccount",
+      "msg": "Compte DEX invalide ou manquant."
+    },
+    {
+      "code": 6008,
+      "name": "ProgramPaused",
+      "msg": "Programme en pause par l'administrateur."
+    },
+    {
+      "code": 6009,
+      "name": "InvalidAdmin",
+      "msg": "Signataire admin invalide."
+    },
+    {
+      "code": 6010,
+      "name": "InvalidFeeMint",
+      "msg": "Mint de frais incorrect."
+    },
+    {
+      "code": 6011,
+      "name": "MinAmountOutViolated",
+      "msg": "Le montant de sortie minimum n'est pas respecté."
+    },
+    {
+      "code": 6012,
+      "name": "PumpFunCpiError",
+      "msg": "Instruction CPI Pump.fun a échoué."
+    },
+    {
+      "code": 6013,
+      "name": "PumpSwapCpiError",
+      "msg": "Instruction CPI PumpSwap a échoué."
+    },
+    {
+      "code": 6014,
+      "name": "OrcaWhirlpoolCpiError",
+      "msg": "Instruction CPI Orca Whirlpool a échoué."
+    },
+    {
+      "code": 6015,
+      "name": "MeteoraDlmmCpiError",
+      "msg": "Instruction CPI Meteora DLMM a échoué."
+    },
+    {
+      "code": 6016,
+      "name": "InvalidMint",
+      "msg": "Le mint du token fourni est invalide."
+    },
+    {
+      "code": 6017,
+      "name": "ProgramStateUnchanged",
+      "msg": "L'état du programme est déjà celui souhaité."
+    },
+    {
+      "code": 6018,
+      "name": "InsufficientUserWsolBalance",
+      "msg": "Solde wSOL de l'utilisateur insuffisant."
+    },
+    {
+      "code": 6019,
+      "name": "TradeAmountExceedsLimit",
+      "msg": "Le montant du trade dépasse la limite fixée."
+    },
+    {
+      "code": 6020,
+      "name": "InvalidNewAdmin",
+      "msg": "La nouvelle clé admin ne peut pas être la clé par défaut."
+    },
+    {
+      "code": 6021,
+      "name": "InvalidServiceFee",
+      "msg": "Les nouveaux frais de service sont invalides (ex: trop élevés)."
+    },
+    {
+      "code": 6022,
+      "name": "InvalidNewBotAuthority",
+      "msg": "La nouvelle clé bot ne peut pas être la clé par défaut."
+    },
+    {
+      "code": 6023,
+      "name": "DelegationMismatch",
+      "msg": "Délégation non trouvée pour cet utilisateur ou ne correspond pas."
+    },
+    {
+      "code": 6024,
+      "name": "InvalidSwapDirection",
+      "msg": "La direction du swap est invalide pour cette instruction."
+    },
+    {
+      "code": 6025,
+      "name": "MustSpecifyInputAmount",
+      "msg": "Le montant doit être spécifié comme input pour cette instruction."
+    },
+    {
+      "code": 6026,
+      "name": "MismatchedDestinationMint",
+      "msg": "Le mint du token de destination ne correspond pas au vault du pool DEX."
+    },
+    {
+      "code": 6027,
+      "name": "InvalidDexProgramId",
+      "msg": "The provided DEX program ID does not match the trusted program ID."
+    },
+    {
+      "code": 6028,
+      "name": "InvalidTreasuryOwner",
+      "msg": "The treasury account owner is invalid."
+    },
+    {
+      "code": 6029,
+      "name": "InvalidBotFeeAccountOwner",
+      "msg": "The bot's fee account owner is invalid."
+    },
+    {
+      "code": 6030,
+      "name": "InvalidOracle",
+      "msg": "The provided Orca oracle account is invalid."
+    },
+    {
+      "code": 6031,
+      "name": "InvalidRemainingAccounts",
+      "msg": "Nombre incorrect de comptes restants fournis pour l'instruction."
+    },
+    {
+      "code": 6032,
+      "name": "InvalidDelegation",
+      "msg": "PDA invalide"
+    }
+  ],
+  "types": [
+    {
+      "name": "AmountPerTradeUpdated",
+      "docs": [
+        "Emitted when a user updates the amount_per_trade limit for their delegation."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "pda",
+            "type": "pubkey"
+          },
+          {
+            "name": "delegation_id",
+            "type": "u64"
+          },
+          {
+            "name": "new_amount_per_trade",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DelegationActiveStatusChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "pda",
+            "type": "pubkey"
+          },
+          {
+            "name": "delegation_id",
+            "type": "u64"
+          },
+          {
+            "name": "is_active",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DelegationCreated",
+      "docs": [
+        "Emitted when a new user delegation is successfully initialized."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "bot_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "pda",
+            "type": "pubkey"
+          },
+          {
+            "name": "user_wsol_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "priority_fee",
+            "type": "u64"
+          },
+          {
+            "name": "delegation_id",
+            "type": "u64"
+          },
+          {
+            "name": "amount_per_trade_limit",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DelegationRevoked",
+      "docs": [
+        "Emitted when a user successfully revokes their delegation."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "pda",
+            "type": "pubkey"
+          },
+          {
+            "name": "delegation_id",
+            "type": "u64"
+          },
+          {
+            "name": "user_wsol_account",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrionDelegation",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user_authority",
+            "docs": [
+              "The public key of the user who owns this delegation."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bot_authority",
+            "docs": [
+              "The public key of the bot authorized to execute trades for this delegation."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "is_active",
+            "docs": [
+              "Flag indicating if the delegation is currently active or has been paused."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "The bump seed used for deriving this PDA (specific to this user and delegation_id)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "in_use",
+            "docs": [
+              "A reentrancy lock to prevent concurrent modification of the delegation during a trade."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "priority_fee_lamports",
+            "docs": [
+              "The base priority fee (in wSOL lamports) the user agrees to contribute."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "amount_per_trade",
+            "docs": [
+              "The maximum amount of wSOL (input token value) for a single trade."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "delegation_id",
+            "docs": [
+              "The unique ID for this specific delegation under a user_authority. Used in PDA seeds."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriorityFeeUpdated",
+      "docs": [
+        "Emitted when a user updates the priority fee for their delegation."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "pda",
+            "type": "pubkey"
+          },
+          {
+            "name": "delegation_id",
+            "type": "u64"
+          },
+          {
+            "name": "new_priority_fee",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProgramPauseStateChanged",
+      "docs": [
+        "Emitted when the program's pause state is changed by the admin."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "is_paused",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProgramState",
+      "docs": [
+        "Global state for the Orion PDA Nexus protocol.",
+        "This account is a PDA derived from `b\"orion_state\"` and stores protocol-wide settings",
+        "and administrative information. It should be initialized once by the program admin."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "docs": [
+              "The public key of the current program administrator.",
+              "This admin can pause the program and change this admin key.",
+              "(Formerly also managed service_fee_bps, now a constant)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "is_paused",
+            "docs": [
+              "A flag indicating if the program is globally paused.",
+              "If true, most operations (except critical ones like `revoke_delegation` or admin functions)",
+              "will be disabled."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "The bump seed used for deriving this ProgramState PDA."
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TradeExecuted",
+      "docs": [
+        "Emitted when a trade is successfully executed via the Orion protocol."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "bot_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "pda",
+            "type": "pubkey"
+          },
+          {
+            "name": "dex",
+            "type": "string"
+          },
+          {
+            "name": "input_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "output_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_in",
+            "type": "u64"
+          },
+          {
+            "name": "delegation_id",
+            "type": "u64"
+          },
+          {
+            "name": "fee_charged_wsol",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}
